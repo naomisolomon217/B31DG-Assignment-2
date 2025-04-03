@@ -47,7 +47,7 @@ void call_T5_task(void *pvParameters);
 void sum_T6_task(void *pvParameters);
 void button_T7_task(void *pvParameters);
 
-// Button ISR
+// Button ISR (task 7)
 void IRAM_ATTR b_T7_ISR() {
   static unsigned long lastDebounceTime = 0;
   unsigned long currentTime = millis();
@@ -65,11 +65,10 @@ void IRAM_ATTR b_T7_ISR() {
 }
 
 void setup() {
-  // Initialize serial
-  Serial.begin(115200);
   
-  // Configure pins
-  pinMode(button_T7, INPUT_PULLUP);  // Changed to PULLUP for more reliable operation
+  Serial.begin(115200);
+
+  pinMode(button_T7, INPUT_PULLUP); 
   pinMode(redOutput_T1, OUTPUT);
   pinMode(orangeOutput_T2, OUTPUT);
   pinMode(yellowLED_T6, OUTPUT);
@@ -92,7 +91,7 @@ void setup() {
   // Attach interrupt for button
   attachInterrupt(digitalPinToInterrupt(button_T7), b_T7_ISR, FALLING);
 
-  // Start the monitor
+  
   monitor.startMonitoring();
   
   delayMicroseconds(100);
@@ -118,19 +117,22 @@ void setup() {
   xTaskCreate(sum_T6_task, "T6_Sum", 2048, NULL, 1, &task6Handle);
   
   // Task 7 - handles button presses (event-driven)
-  xTaskCreate(button_T7_task, "T7_Button", 1024, NULL, 5, &task7Handle);
+  xTaskCreate(button_T7_task, "T7_Button", 1024, NULL, 1, &task7Handle);
 }
 
 void signal_T1_task(void *pvParameters) {
   // Get current tick count for vTaskDelayUntil
   TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = pdMS_TO_TICKS(4); // 4ms period = 250Hz
+  const TickType_t xFrequency = pdMS_TO_TICKS(4); 
+
+  /* Task 1: Output digital signal 
+     high 250us - low 50us - high 300us - low 
+     measured to take 602us */
 
   while (1) {
-    // Notify monitor of job start
+    
     monitor.jobStarted(1);
     
-    // Generate first signal - same timing as cyclic executive
     digitalWrite(redOutput_T1, HIGH);
     delayMicroseconds(250);
     digitalWrite(redOutput_T1, LOW);
@@ -139,10 +141,9 @@ void signal_T1_task(void *pvParameters) {
     delayMicroseconds(300);
     digitalWrite(redOutput_T1, LOW);
     
-    // Notify monitor of job end
+  
     monitor.jobEnded(1);
     
-    // Wait for the next cycle using vTaskDelayUntil for precise timing
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
@@ -152,11 +153,14 @@ void signal_T2_task(void *pvParameters) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(3); // 3ms period = 333Hz
 
+  /* Task 2: Output digital signal 
+  high 100us - low 50us - high 200us - low 
+  measured to take 353us */
+
   while (1) {
-    // Notify monitor of job start
+    
     monitor.jobStarted(2);
     
-    // Generate second signal - same timing as cyclic executive
     digitalWrite(orangeOutput_T2, HIGH);
     delayMicroseconds(100);
     digitalWrite(orangeOutput_T2, LOW);
@@ -165,10 +169,9 @@ void signal_T2_task(void *pvParameters) {
     delayMicroseconds(200);
     digitalWrite(orangeOutput_T2, LOW);
     
-    // Notify monitor of job end
+    
     monitor.jobEnded(2);
     
-    // Wait for the next cycle using vTaskDelayUntil for precise timing
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
@@ -179,8 +182,12 @@ void poll_T3_task(void *pvParameters) {
   const TickType_t xFrequency = pdMS_TO_TICKS(10); // 10ms period = 100Hz
   uint32_t local_freq;
 
+  /* Task 3: Poll frequency of input 3.3v square wave signal
+            measured between 666Hz (worst case execution), 
+            and 1000Hz (best case execution)*/
+
   while (1) {
-    // Notify monitor of job start
+    
     monitor.jobStarted(3);
     
     // Poll frequency of first signal
@@ -197,10 +204,8 @@ void poll_T3_task(void *pvParameters) {
       }
     }
     
-    // Notify monitor of job end
     monitor.jobEnded(3);
     
-    // Wait for the next cycle using vTaskDelayUntil for precise timing
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
@@ -211,8 +216,13 @@ void poll_T4_task(void *pvParameters) {
   const TickType_t xFrequency = pdMS_TO_TICKS(10); // 10ms period = 100Hz
   uint32_t local_freq;
 
+  /* Task 4: Poll frequency of input 3.3v square wave signal
+            measured between 833Hz (worst case execution), 
+            and 1500Hz (best case execution)
+*/
+
   while (1) {
-    // Notify monitor of job start
+    
     monitor.jobStarted(4);
     
     // Poll frequency of second signal
@@ -228,8 +238,7 @@ void poll_T4_task(void *pvParameters) {
         xSemaphoreGive(freqMutex);
       }
     }
-    
-    // Notify monitor of job end
+  
     monitor.jobEnded(4);
     
     // Wait for the next cycle using vTaskDelayUntil for precise timing
@@ -243,16 +252,14 @@ void call_T5_task(void *pvParameters) {
   const TickType_t xFrequency = pdMS_TO_TICKS(5); // 5ms period = 200Hz
 
   while (1) {
-    // Notify monitor of job start
+    
     monitor.jobStarted(5);
     
-    // Call doWork method
+    // Task 5: Call doWork method
     monitor.doWork();
-    
-    // Notify monitor of job end
+  
     monitor.jobEnded(5);
     
-    // Wait for the next cycle using vTaskDelayUntil for precise timing
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
   }
 }
@@ -260,8 +267,9 @@ void call_T5_task(void *pvParameters) {
 void sum_T6_task(void *pvParameters) {
   uint32_t local_freq_T3, local_freq_T4, freqTotal_T6;
   
-  // No specific period for this task, run less frequently
   const TickType_t xDelay = pdMS_TO_TICKS(20);
+   
+   // Task 6: LED control based on frequency sum (of task 3 and 4)
 
   while (1) {
     // Read frequencies with mutex protection
@@ -287,8 +295,8 @@ void sum_T6_task(void *pvParameters) {
 }
 
 void button_T7_task(void *pvParameters) {
-  // LED state variable to track LED state
-  static bool led_state_T7 = false;
+  
+  static bool led_state_T7 = false; // green LED state
   
   while (1) {
     // Wait for notification from ISR
@@ -297,13 +305,13 @@ void button_T7_task(void *pvParameters) {
       led_state_T7 = !led_state_T7;
       digitalWrite(greenLED_T7, led_state_T7);
       
-      // Call monitor's doWork method as required
+      // Call doWork method 
       monitor.doWork();
     }
   }
 }
 
 void loop() {
-  // Empty loop as FreeRTOS scheduler handles all tasks
+ 
   vTaskDelay(1000 / portTICK_PERIOD_MS);
 }
